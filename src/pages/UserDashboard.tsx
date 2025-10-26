@@ -50,6 +50,37 @@ const UserDashboard = () => {
     throw lastErr;
   }
 
+  // --- NEW CONFIGURATION: External Mail Server URL ---
+  // IMPORTANT: This URL points directly to your test-server.js file's endpoint.
+  const EXTERNAL_MAIL_API = 'http://localhost:3001/api/send-test-email';
+
+  // --- NEW FUNCTION: Direct Email API Call ---
+  const sendNotificationEmail = async (issueTitle: string, userEmail: string) => {
+    const subject = `[NagarNetra] Report Submitted: ${issueTitle}`;
+    const htmlContent = `<h1>Thank You for Your Report!</h1>
+                       <p>Your issue "${issueTitle}" has been successfully logged and is under review by the authorities. You will receive an email whenever its status changes.</p>
+                       <p>-- NagarNetra Transparency System</p>`;
+
+    try {
+      // The frontend initiates the request to the backend server
+      await fetch(EXTERNAL_MAIL_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          title: subject,
+          description: htmlContent, // Sending the content the backend expects
+        }),
+      });
+      console.log(`Notification email queued successfully for ${userEmail} via server.`);
+    } catch (e) {
+      // Catches network errors (server not running, CORS issues)
+      console.error("FAILED to connect to external mail server:", EXTERNAL_MAIL_API, e);
+      toast.warning('Warning: Could not send email notification.');
+    }
+  };
+  // --- END NEW FUNCTION ---
+
   useEffect(() => {
     (async () => {
       if (!user?.id) { setLoading(false); return; }
@@ -162,6 +193,14 @@ const UserDashboard = () => {
         media: mediaUrls,
         created_by: user.id,
       } as any);
+
+      // --- MODIFIED CODE: CALLING EXTERNAL MAIL SERVER DIRECTLY ---
+      // This ensures the server.js file is triggered immediately after successful DB insert.
+      // We do NOT await this call, so the UI remains responsive.
+      if (user.email) {
+          sendNotificationEmail(created.title, user.email);
+      }
+
       toast.success('Issue submitted');
       setIssues((prev) => [created, ...prev]);
       try {
